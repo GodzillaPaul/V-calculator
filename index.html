@@ -1,1 +1,1456 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>月配息計算機｜Premium Dividend Master</title>
+<style>
+:root {
+  --ink: #1f2937;
+  --deep: #334155;
+  --muted: #7a8496;
+  --line: rgba(160, 174, 192, .24);
+  --glass: rgba(255, 255, 255, .78);
+  --white: #ffffff;
 
+  --blue: #2f80ed;
+  --blue-soft: #dbeafe;
+  --purple: #9b5de5;
+  --pink: #f472b6;
+  --orange: #fb8b4b;
+  --sun: #ffd166;
+
+  --gradient-main: linear-gradient(100deg, #2f80ed 0%, #7c5cff 36%, #e75ba8 68%, #fb8b4b 100%);
+  --gradient-soft: linear-gradient(135deg, rgba(47,128,237,.18), rgba(155,93,229,.14), rgba(244,114,182,.13), rgba(251,139,75,.11));
+  --radius: 24px;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 15% 8%, rgba(47,128,237,.18), transparent 30%),
+    radial-gradient(circle at 88% 16%, rgba(251,139,75,.16), transparent 28%),
+    radial-gradient(circle at 48% 42%, rgba(244,114,182,.13), transparent 35%),
+    linear-gradient(145deg, #fbfcff 0%, #f3f6fb 46%, #ffffff 100%);
+  padding: 26px 14px 38px;
+  line-height: 1.55;
+}
+
+button, input, select {
+  font: inherit;
+}
+
+.app {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  animation: riseIn .55s cubic-bezier(.22,1,.36,1);
+}
+
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.topbar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.brand-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.72);
+  border: 1px solid rgba(255,255,255,.8);
+  box-shadow: 0 12px 30px -22px rgba(47, 91, 170, .45);
+  font-size: 11px;
+  font-weight: 800;
+  color: #526179;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.brand-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--gradient-main);
+  box-shadow: 0 0 0 6px rgba(124,92,255,.12);
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(30px, 5.6vw, 40px);
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+  font-weight: 850;
+  color: #1f2937;
+}
+
+.subtitle {
+  margin-top: 7px;
+  font-size: 14px;
+  color: #667085;
+  font-weight: 500;
+}
+
+.fx-tag {
+  border: 1px solid rgba(255,255,255,.82);
+  background: rgba(255,255,255,.74);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  color: #3b475c;
+  border-radius: 20px;
+  padding: 11px 14px;
+  box-shadow: 0 18px 38px -28px rgba(47,91,170,.5);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+
+.fx-tag:hover {
+  transform: translateY(-2px);
+  border-color: rgba(155,93,229,.38);
+  box-shadow: 0 24px 44px -30px rgba(47,91,170,.58);
+}
+
+.fx-label {
+  display: block;
+  font-size: 10px;
+  color: #8a94a7;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.fx-value {
+  display: block;
+  margin-top: 1px;
+  font-size: 16px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
+.card {
+  position: relative;
+  background: var(--glass);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,.82);
+  border-radius: 34px;
+  padding: 24px;
+  box-shadow:
+    0 34px 92px -58px rgba(47,91,170,.68),
+    inset 0 1px 0 rgba(255,255,255,.78);
+  overflow: hidden;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 5px;
+  background: var(--gradient-main);
+}
+
+.card::after {
+  content: "";
+  position: absolute;
+  top: -90px;
+  right: -90px;
+  width: 190px;
+  height: 190px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255,209,102,.25), transparent 60%);
+  pointer-events: none;
+}
+
+.step {
+  margin-bottom: 14px;
+  padding: 15px;
+  border: 1px solid rgba(160,174,192,.18);
+  border-radius: 24px;
+  background: rgba(255,255,255,.56);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
+  position: relative;
+  z-index: 1;
+}
+
+.step-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 9px;
+}
+
+.step-no {
+  width: 25px;
+  height: 25px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  background: var(--gradient-main);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 850;
+  box-shadow: 0 9px 20px -12px rgba(124,92,255,.85);
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 750;
+  color: #334155;
+}
+
+.hint {
+  font-size: 11px;
+  color: #8a94a7;
+  font-weight: 500;
+  margin-left: 5px;
+}
+
+.fund-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 9px;
+}
+
+input[type="text"],
+input[type="number"],
+select {
+  width: 100%;
+  min-height: 54px;
+  padding: 14px 15px;
+  border: 1.5px solid rgba(160,174,192,.28);
+  border-radius: 18px;
+  font-size: 16px;
+  font-weight: 650;
+  color: #1f2937;
+  background: rgba(255,255,255,.82);
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.84);
+  transition: border-color .22s cubic-bezier(.4,0,.2,1), box-shadow .22s cubic-bezier(.4,0,.2,1), transform .22s cubic-bezier(.4,0,.2,1), background .22s;
+  font-variant-numeric: tabular-nums;
+}
+
+input:focus,
+select:focus {
+  border-color: rgba(124,92,255,.58);
+  box-shadow:
+    0 0 0 4px rgba(124,92,255,.12),
+    0 14px 30px -24px rgba(47,91,170,.58);
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+.meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  min-height: 18px;
+  color: #8a94a7;
+  font-size: 11px;
+}
+
+.meta-row a {
+  color: #2f80ed;
+  text-decoration: none;
+  font-weight: 750;
+}
+
+.flash {
+  animation: flashRing .72s ease;
+}
+
+@keyframes flashRing {
+  0% { box-shadow: 0 0 0 0 rgba(124,92,255,0); }
+  22% { box-shadow: 0 0 0 5px rgba(124,92,255,.16); border-color: rgba(124,92,255,.68); }
+  100% { box-shadow: 0 0 0 0 rgba(124,92,255,0); }
+}
+
+.error {
+  display: none;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 700;
+  margin: -2px 0 12px;
+}
+
+.error.show { display: block; }
+
+.hero-panel {
+  margin-top: 18px;
+  border-radius: 30px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 30px 76px -40px rgba(47,91,170,.72);
+  border: 1px solid rgba(255,255,255,.72);
+  position: relative;
+  z-index: 1;
+}
+
+.result-card {
+  margin-top: 0;
+  color: #fff;
+  border-radius: 0;
+  padding: 34px 22px 28px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 84% 18%, rgba(255,209,102,.32), transparent 20%),
+    radial-gradient(circle at 16% 82%, rgba(47,128,237,.22), transparent 28%),
+    linear-gradient(120deg, #2f80ed 0%, #805fe8 42%, #e85bab 72%, #fb8b4b 100%);
+  box-shadow: none;
+}
+
+.result-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(122deg, rgba(255,255,255,.25), transparent 34%),
+    radial-gradient(circle at 50% 115%, rgba(255,255,255,.45), transparent 38%);
+  pointer-events: none;
+}
+
+.result-card::after {
+  content: "";
+  position: absolute;
+  bottom: -48px;
+  left: -20px;
+  width: 120%;
+  height: 120px;
+  background:
+    radial-gradient(ellipse at 20% 40%, rgba(219,234,254,.55), transparent 44%),
+    radial-gradient(ellipse at 78% 40%, rgba(252,231,243,.50), transparent 48%);
+  pointer-events: none;
+}
+
+.result-label {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  color: rgba(255,255,255,.86);
+  font-weight: 800;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+.result-value {
+  position: relative;
+  z-index: 1;
+  margin: 8px 0 5px;
+  font-size: clamp(42px, 8vw, 58px);
+  line-height: 1;
+  letter-spacing: -0.05em;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  text-shadow: 0 18px 34px rgba(56, 41, 95, .24);
+}
+
+.result-sub {
+  position: relative;
+  z-index: 1;
+  font-size: 13px;
+  color: rgba(255,255,255,.84);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: rgba(160,174,192,.18);
+}
+
+.kpi-card {
+  padding: 18px 16px;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.94), rgba(248,250,252,.88));
+  color: #1f2937;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::after {
+  content: "";
+  position: absolute;
+  right: -26px;
+  bottom: -26px;
+  width: 84px;
+  height: 84px;
+  border-radius: 999px;
+  background: var(--gradient-soft);
+}
+
+.kpi-label {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: .06em;
+}
+
+.kpi-value {
+  margin-top: 4px;
+  font-size: 29px;
+  font-weight: 850;
+  letter-spacing: -0.035em;
+  background: var(--gradient-main);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-value.small {
+  font-size: 23px;
+}
+
+.kpi-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #8a94a7;
+}
+
+.investment-meter {
+  margin-top: 18px;
+  padding: 15px;
+  border-radius: 24px;
+  background: rgba(255,255,255,.62);
+  border: 1px solid rgba(160,174,192,.18);
+  position: relative;
+  z-index: 1;
+}
+
+.meter-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 750;
+  color: #334155;
+  margin-bottom: 9px;
+}
+
+.meter-value {
+  color: #7c5cff;
+  font-variant-numeric: tabular-nums;
+}
+
+.meter-track {
+  height: 11px;
+  border-radius: 999px;
+  background: #e9eef6;
+  overflow: hidden;
+}
+
+.meter-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--gradient-main);
+  transition: width .45s cubic-bezier(.22,1,.36,1);
+}
+
+.breakdown-toggle {
+  margin-top: 14px;
+  border: 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #334155;
+  background: rgba(255,255,255,.72);
+  border-radius: 22px;
+  padding: 13px 14px;
+  cursor: pointer;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px rgba(160,174,192,.18);
+  position: relative;
+  z-index: 1;
+}
+
+.toggle-icon {
+  width: 27px;
+  height: 27px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  background: var(--gradient-main);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.details {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .38s ease;
+  position: relative;
+  z-index: 1;
+}
+
+.details.open {
+  max-height: 760px;
+}
+
+.details-inner {
+  padding-top: 12px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 2px;
+  border-bottom: 1px dashed rgba(160,174,192,.36);
+  font-size: 14px;
+}
+
+.detail-row:last-child { border-bottom: 0; }
+
+.detail-label {
+  color: #7a8496;
+  font-weight: 650;
+}
+
+.detail-value {
+  font-weight: 760;
+  color: #1f2937;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(31,41,55,.46);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.modal-backdrop.show { display: flex; }
+
+.modal {
+  width: 100%;
+  max-width: 430px;
+  max-height: 88vh;
+  overflow-y: auto;
+  background: rgba(255,255,255,.94);
+  border-radius: 28px;
+  padding: 22px;
+  box-shadow: 0 36px 90px -42px rgba(0,0,0,.52);
+  border: 1px solid rgba(255,255,255,.72);
+}
+
+.modal h2 {
+  margin: 0 0 16px;
+  font-size: 20px;
+  letter-spacing: -.03em;
+  color: #1f2937;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.modal-actions button {
+  border: 0;
+  border-radius: 16px;
+  padding: 11px 16px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.modal-actions .secondary {
+  background: #e9eef6;
+  color: #334155;
+}
+
+.modal-actions .primary {
+  background: var(--gradient-main);
+  color: #fff;
+}
+
+.fund-list,
+.fund-item,
+.fund-item-top,
+.fund-name,
+.fund-meta,
+.del-btn,
+.grid {
+  display: none;
+}
+
+@media (max-width: 520px) {
+  body { padding: 20px 12px 32px; }
+  .topbar { grid-template-columns: 1fr; }
+  .fx-tag { justify-self: start; }
+  .card { padding: 18px; border-radius: 28px; }
+  .step { padding: 13px; }
+  .kpi-grid { grid-template-columns: 1fr; }
+  .result-value { font-size: 44px; }
+}
+
+.auto-status {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 9px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.72);
+  border: 1px solid rgba(160,174,192,.22);
+  color: #667085;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 10px 24px -20px rgba(47,91,170,.45);
+}
+.auto-status.ok { color: #2f80ed; }
+.auto-status.fail { color: #dc2626; }
+
+
+/* --- 完整版 IX：滑動基金卡片 + 可輸入感 --- */
+input[type="text"],
+input[type="number"] {
+  background: rgba(255,255,255,.58);
+  color: #94a3b8;
+  font-weight: 560;
+}
+
+input[type="text"]:not(:placeholder-shown),
+input[type="number"]:not(:placeholder-shown) {
+  background: #ffffff;
+  color: #1f2937;
+  font-weight: 720;
+}
+
+input::placeholder {
+  color: #c5cedb;
+  font-weight: 520;
+}
+
+.fund-slider {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 6px 4px 10px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.fund-slider::-webkit-scrollbar {
+  display: none;
+}
+
+.fund-card {
+  position: relative;
+  flex: 0 0 156px;
+  min-height: 94px;
+  border-radius: 22px;
+  padding: 14px;
+  background: rgba(255,255,255,.62);
+  border: 1px solid rgba(160,174,192,.24);
+  box-shadow:
+    0 16px 30px -24px rgba(47,91,170,.45),
+    inset 0 1px 0 rgba(255,255,255,.8);
+  cursor: pointer;
+  scroll-snap-align: center;
+  transition: transform .24s cubic-bezier(.22,1,.36,1), box-shadow .24s ease, border-color .24s ease, background .24s ease;
+  overflow: hidden;
+}
+
+.fund-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 82% 16%, rgba(255,209,102,.18), transparent 28%),
+    linear-gradient(135deg, rgba(47,128,237,.06), rgba(155,93,229,.05), rgba(244,114,182,.04));
+  opacity: .85;
+  pointer-events: none;
+}
+
+.fund-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(124,92,255,.32);
+  box-shadow:
+    0 22px 44px -28px rgba(47,91,170,.55),
+    inset 0 1px 0 rgba(255,255,255,.9);
+}
+
+.fund-card.active {
+  transform: translateY(-3px) scale(1.015);
+  border-color: rgba(255,255,255,.75);
+  background:
+    linear-gradient(135deg, rgba(47,128,237,.96), rgba(124,92,255,.96), rgba(232,91,171,.92), rgba(251,139,75,.9));
+  box-shadow:
+    0 20px 42px -22px rgba(124,92,255,.62),
+    0 8px 18px -14px rgba(251,139,75,.55);
+}
+
+.fund-card.active::before {
+  opacity: 1;
+  background:
+    radial-gradient(circle at 84% 12%, rgba(255,255,255,.3), transparent 24%),
+    radial-gradient(circle at 10% 90%, rgba(255,255,255,.18), transparent 28%);
+}
+
+.fund-code {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.72);
+  color: #475569;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: .02em;
+}
+
+.fund-card.active .fund-code {
+  background: rgba(255,255,255,.24);
+  color: #fff;
+}
+
+.fund-title {
+  position: relative;
+  z-index: 1;
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.28;
+  font-weight: 760;
+  color: #334155;
+  min-height: 34px;
+}
+
+.fund-card.active .fund-title {
+  color: #fff;
+}
+
+.fund-mini {
+  position: relative;
+  z-index: 1;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 650;
+  color: #8a94a7;
+  font-variant-numeric: tabular-nums;
+}
+
+.fund-card.active .fund-mini {
+  color: rgba(255,255,255,.82);
+}
+
+.slider-hint {
+  margin-top: -2px;
+  font-size: 11px;
+  color: #98a2b3;
+  font-weight: 600;
+}
+
+.step.fund-step {
+  padding-bottom: 11px;
+}
+
+@keyframes selectedPulse {
+  0% { box-shadow: 0 0 0 0 rgba(124,92,255,.0), 0 20px 42px -22px rgba(124,92,255,.62); }
+  35% { box-shadow: 0 0 0 6px rgba(124,92,255,.12), 0 20px 42px -22px rgba(124,92,255,.62); }
+  100% { box-shadow: 0 0 0 0 rgba(124,92,255,.0), 0 20px 42px -22px rgba(124,92,255,.62); }
+}
+
+.fund-card.just-selected {
+  animation: selectedPulse .55s ease;
+}
+
+@media (max-width: 520px) {
+  .fund-card {
+    flex-basis: 148px;
+  }
+}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div>
+      <div class="brand-eyebrow"><span class="brand-dot"></span>Premium Dividend Tool</div>
+      <h1>月配息計算機</h1>
+      <div class="subtitle">輸入金額即時試算，讓現金流自己說話。</div>
+      <div class="auto-status" id="autoStatus">正在嘗試更新最新資料…</div>
+    </div>
+
+    <button class="fx-tag" onclick="openRateModal()" aria-label="更新匯率">
+      <span class="fx-label">USD / TWD</span>
+      <span class="fx-value" id="rateDisplay">31.423</span>
+    </button>
+  </div>
+
+  <div class="card">
+    <div class="step fund-step">
+      <div class="step-head">
+        <span class="step-no">1</span>
+        <label for="fundSelect">選擇基金標的</label>
+      </div>
+      <div class="fund-row">
+        <select id="fundSelect"></select>
+        
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <span class="step-no">2</span>
+        <label for="principal">預計投入金額 <span class="hint">新台幣</span></label>
+      </div>
+      <input type="text" id="principal" inputmode="numeric" placeholder="例如：2,000,000">
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <span class="step-no">3</span>
+        <label for="nav">當日淨值</label>
+      </div>
+      <input type="text" id="nav" inputmode="decimal" placeholder="例如：8.5978">
+      <div class="meta-row">
+        <span id="navDateLabel"></span>
+        <span id="navLinkWrap"></span>
+      </div>
+    </div>
+
+    <div class="error" id="errMsg"></div>
+
+    <div class="hero-panel">
+      <div class="result-card">
+        <div class="result-label">預估每月配息</div>
+        <div class="result-value" id="outTwd">NT$ 0</div>
+        <div class="result-sub" id="outSub">輸入金額後即時產生結果</div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">年化配息率</div>
+          <div class="kpi-value" id="annualYield">—</div>
+          <div class="kpi-sub">以投入金額計算</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">年配息金額</div>
+          <div class="kpi-value small" id="annualIncome">—</div>
+          <div class="kpi-sub">每月配息 × 12</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="investment-meter">
+      <div class="meter-head">
+        <span>實際投入比率</span>
+        <span class="meter-value" id="meterText">—</span>
+      </div>
+      <div class="meter-track"><div class="meter-fill" id="meterFill"></div></div>
+    </div>
+
+    <button class="breakdown-toggle" onclick="toggleBreakdown()">
+      <span>計算明細</span>
+      <span class="toggle-icon" id="toggleIcon">＋</span>
+    </button>
+
+    <div class="details" id="details">
+      <div class="details-inner">
+        <div class="detail-row"><span class="detail-label">投入金額（保險費）</span><span class="detail-value" id="bPrincipal">—</span></div>
+        <div class="detail-row"><span class="detail-label">手續費率</span><span class="detail-value" id="bFeeRate">—</span></div>
+        <div class="detail-row"><span class="detail-label">手續費</span><span class="detail-value" id="bFee">—</span></div>
+        <div class="detail-row"><span class="detail-label">實際投資金額（台幣）</span><span class="detail-value" id="bNet">—</span></div>
+        <div class="detail-row" id="bNetUsdRow"><span class="detail-label">實際投資金額（美金）</span><span class="detail-value" id="bNetUsd">—</span></div>
+        <div class="detail-row"><span class="detail-label">淨值</span><span class="detail-value" id="bNav">—</span></div>
+        <div class="detail-row"><span class="detail-label">單位數</span><span class="detail-value" id="bUnits">—</span></div>
+        <div class="detail-row"><span class="detail-label">每單位配息金額</span><span class="detail-value" id="bRate">—</span></div>
+        <div class="detail-row" id="bFxRow"><span class="detail-label">匯率</span><span class="detail-value" id="bFx">—</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="rateModal">
+  <div class="modal">
+    <h2>更新 USD / TWD 匯率</h2>
+    <label for="rateInput">目前匯率</label>
+    <input type="text" id="rateInput" inputmode="decimal">
+    <div class="modal-actions">
+      <button class="secondary" onclick="closeRateModal()">取消</button>
+      <button class="primary" onclick="saveRate()">儲存</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+const STORAGE_KEY = "monthlyDividendPremium.v1";
+const DEFAULT_STATE = {
+  funds: [
+    { name: "DSP5（安聯收益成長 AM 美元）", rate: 0.055, nav: 8.5978, navDate: "2026-04-23", currency: "USD", url: "https://invest.fubonlife.com.tw/w/wb/wb02.djhtm?a=TLZ64-DSP5" },
+    { name: "NGB1（高盛環球高收益 X 美元）", rate: 0.51, nav: 39.6500, navDate: "2026-04-23", currency: "USD", url: "https://invest.fubonlife.com.tw/w/wb/wb02.djhtm?a=ANZ89-NGB1" },
+    { name: "NGB2（高盛新興市場債 X 美元）", rate: 0.59, nav: 40.4700, navDate: "2026-04-23", currency: "USD", url: "https://invest.fubonlife.com.tw/w/wb/wb02.djhtm?a=ANZA2-NGB2" },
+    { name: "FBD6（富邦月月興利 VAKT）", rate: 0.0468, nav: 8.9966, navDate: "2026-04-23", currency: "TWD", url: "https://invest.fubonlife.com.tw/w/wr/cf02.djhtm?a=FBD6" }
+  ],
+  fxRate: 31.423,
+  fxDate: "2026-04-25",
+  selected: "DSP5（安聯收益成長 AM 美元）"
+};
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return structuredClone(DEFAULT_STATE);
+    const s = JSON.parse(raw);
+    return { ...structuredClone(DEFAULT_STATE), ...s };
+  } catch (e) {
+    return structuredClone(DEFAULT_STATE);
+  }
+}
+
+let state = loadState();
+let breakdownOpen = false;
+let lastDisplayedMonthly = 0;
+let countTimer = null;
+
+const $ = (id) => document.getElementById(id);
+const today = () => new Date().toISOString().slice(0, 10);
+const escapeAttr = (s) => String(s || "").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+const parseNum = (s) => {
+  if (typeof s !== "string") s = String(s ?? "");
+  const n = parseFloat(s.replace(/,/g, "").trim());
+  return isFinite(n) ? n : NaN;
+};
+const fmt = (n, dp = 2) => isFinite(n) ? n.toLocaleString("zh-TW", { minimumFractionDigits: dp, maximumFractionDigits: dp }) : "—";
+const fmt0 = (n) => isFinite(n) ? n.toLocaleString("zh-TW", { maximumFractionDigits: 0 }) : "—";
+
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+
+function feeRate(twd) {
+  if (twd < 2_000_000) return 0.05;
+  if (twd < 5_000_000) return 0.04;
+  if (twd < 10_000_000) return 0.03;
+  return 0.02;
+}
+
+function getSelectedFund() {
+  return state.funds.find(f => f.name === state.selected) || state.funds[0];
+}
+
+
+function getFundCode(name) {
+  const m = String(name || "").match(/^([^（\s]+)/);
+  return m ? m[1] : String(name || "").slice(0, 6);
+}
+
+function getFundShortTitle(name) {
+  const s = String(name || "");
+  const inside = s.match(/（(.+?)）/);
+  if (inside) return inside[1].replace(/\s+/g, " ");
+  return s.replace(/^([^（\s]+)/, "").replace(/[（）]/g, "").trim() || s;
+}
+
+function renderFundSlider() {
+  const slider = $("fundSlider");
+  if (!slider) return;
+  slider.innerHTML = "";
+
+  state.funds.forEach(f => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "fund-card" + (f.name === state.selected ? " active" : "");
+    card.dataset.fund = f.name;
+
+    const navText = isFinite(Number(f.nav)) ? `淨值 ${Number(f.nav).toFixed(4).replace(/\.?0+$/, "")}` : "淨值待更新";
+    const rateText = isFinite(Number(f.rate)) ? `配息 ${f.rate}` : "配息待更新";
+
+    card.innerHTML = `
+      <div class="fund-code">${getFundCode(f.name)}</div>
+      <div class="fund-title">${getFundShortTitle(f.name)}</div>
+      <div class="fund-mini">${navText}｜${rateText}</div>
+    `;
+
+    card.addEventListener("click", () => {
+      state.selected = f.name;
+      const sel = $("fundSelect");
+      if (sel) sel.value = f.name;
+      saveState();
+      renderFundSlider();
+      syncFromFund(false);
+
+      const active = document.querySelector(`.fund-card[data-fund="${CSS.escape(f.name)}"]`);
+      if (active) {
+        active.classList.add("just-selected");
+        active.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        setTimeout(() => active.classList.remove("just-selected"), 600);
+      }
+
+      if (navigator.vibrate) navigator.vibrate(12);
+    });
+
+    slider.appendChild(card);
+  });
+}
+
+function renderFundSelect() {
+  const sel = $("fundSelect");
+  sel.innerHTML = "";
+  state.funds.forEach(f => sel.add(new Option(f.name, f.name)));
+  if (!state.funds.find(f => f.name === state.selected) && state.funds.length) state.selected = state.funds[0].name;
+  sel.value = state.selected;
+  renderFundSlider();
+  syncFromFund(true);
+}
+
+function renderRate() {
+  $("rateDisplay").textContent = Number(state.fxRate).toFixed(3);
+}
+
+function syncFromFund(skipFlash = false) {
+  const fund = getSelectedFund();
+  if (!fund) return;
+
+  const navInput = $("nav");
+  if (isFinite(Number(fund.nav)) && Number(fund.nav) > 0) {
+    navInput.value = Number(fund.nav).toFixed(4).replace(/\.?0+$/, "");
+    $("navDateLabel").textContent = fund.navDate ? `上次更新：${fund.navDate}` : "";
+  } else {
+    navInput.value = "";
+    $("navDateLabel").textContent = "";
+  }
+
+  $("navLinkWrap").innerHTML = fund.url
+    ? `<a href="${escapeAttr(fund.url)}" target="_blank" rel="noopener">查最新淨值 ↗</a>`
+    : "";
+
+  if (!skipFlash) {
+    navInput.classList.remove("flash");
+    void navInput.offsetWidth;
+    navInput.classList.add("flash");
+  }
+
+  calculate({ silent: true });
+}
+
+function formatPrincipalInput(e) {
+  const val = e.target.value.replace(/[^\d]/g, "");
+  e.target.value = val ? Number(val).toLocaleString("en-US") : "";
+}
+
+function showErr(msg) {
+  $("errMsg").textContent = msg;
+  $("errMsg").classList.add("show");
+}
+
+function clearErr() {
+  $("errMsg").classList.remove("show");
+}
+
+function animateNumber(target) {
+  const el = $("outTwd");
+  const start = lastDisplayedMonthly || 0;
+  const end = isFinite(target) ? target : 0;
+  const duration = 520;
+  const startTime = performance.now();
+
+  if (countTimer) cancelAnimationFrame(countTimer);
+
+  function tick(now) {
+    const progress = Math.min((now - startTime) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const value = start + (end - start) * eased;
+    el.textContent = "NT$ " + fmt0(value);
+    if (progress < 1) countTimer = requestAnimationFrame(tick);
+    else lastDisplayedMonthly = end;
+  }
+
+  countTimer = requestAnimationFrame(tick);
+}
+
+function calculate(options = {}) {
+  clearErr();
+
+  const principal = parseNum($("principal").value);
+  const nav = parseNum($("nav").value);
+  const fund = getSelectedFund();
+
+  if (!fund) {
+    if (!options.silent) showErr("請先新增基金");
+    return;
+  }
+
+  if (!isFinite(principal) || principal <= 0 || !isFinite(nav) || nav <= 0) {
+    animateNumber(0);
+    $("outSub").textContent = "輸入金額後即時產生結果";
+    $("meterText").textContent = "—";
+    $("meterFill").style.width = "0%";
+    $("annualYield").textContent = "—";
+    $("annualIncome").textContent = "—";
+    resetDetails();
+    return;
+  }
+
+  if (Number(fund.nav) !== nav) {
+    fund.nav = nav;
+    fund.navDate = today();
+    saveState();
+    $("navDateLabel").textContent = `上次更新：${fund.navDate}`;
+  }
+
+  const fr = feeRate(principal);
+  const fee = principal * fr;
+  const netTwd = principal - fee;
+  const actualRatio = Math.max(0, Math.min(100, (netTwd / principal) * 100));
+  const isTwd = fund.currency === "TWD";
+
+  let units, monthlyTwd, monthlyUsd, netUsd;
+
+  if (isTwd) {
+    units = netTwd / nav;
+    monthlyTwd = units * Number(fund.rate);
+    monthlyUsd = NaN;
+    netUsd = NaN;
+    $("outSub").textContent = "台幣標的｜每月預估現金流";
+    $("bNetUsdRow").style.display = "none";
+    $("bFxRow").style.display = "none";
+  } else {
+    netUsd = netTwd / Number(state.fxRate);
+    units = netUsd / nav;
+    monthlyUsd = units * Number(fund.rate);
+    monthlyTwd = monthlyUsd * Number(state.fxRate);
+    $("outSub").textContent = `≈ $${fmt(monthlyUsd, 2)} USD / 月`;
+    $("bNetUsdRow").style.display = "flex";
+    $("bFxRow").style.display = "flex";
+    $("bNetUsd").textContent = "$" + fmt(netUsd, 2);
+    $("bFx").textContent = Number(state.fxRate).toFixed(3);
+  }
+
+  animateNumber(monthlyTwd);
+  const annualIncome = monthlyTwd * 12;
+  const annualYield = principal > 0 ? (annualIncome / principal) * 100 : NaN;
+  $("annualYield").textContent = isFinite(annualYield) ? annualYield.toFixed(2) + "%" : "—";
+  $("annualIncome").textContent = "NT$ " + fmt0(annualIncome);
+  $("meterText").textContent = `${actualRatio.toFixed(0)}% 實際投入｜${(fr * 100).toFixed(0)}% 費用`;
+  $("meterFill").style.width = actualRatio + "%";
+
+  $("bPrincipal").textContent = "NT$ " + fmt0(principal);
+  $("bFeeRate").textContent = (fr * 100).toFixed(0) + "%";
+  $("bFee").textContent = "NT$ " + fmt0(fee);
+  $("bNet").textContent = "NT$ " + fmt0(netTwd);
+  $("bNav").textContent = fmt(nav, 4);
+  $("bUnits").textContent = fmt(units, 4);
+  $("bRate").textContent = String(fund.rate);
+}
+
+function resetDetails() {
+  ["bPrincipal","bFeeRate","bFee","bNet","bNetUsd","bNav","bUnits","bRate","bFx"].forEach(id => $(id).textContent = "—");
+}
+
+function toggleBreakdown() {
+  breakdownOpen = !breakdownOpen;
+  $("details").classList.toggle("open", breakdownOpen);
+  $("toggleIcon").textContent = breakdownOpen ? "－" : "＋";
+}
+
+function openRateModal() {
+  $("rateInput").value = state.fxRate;
+  $("rateModal").classList.add("show");
+}
+
+function closeRateModal() {
+  $("rateModal").classList.remove("show");
+}
+
+function saveRate() {
+  const v = parseNum($("rateInput").value);
+  if (!isFinite(v) || v <= 0) {
+    alert("請輸入有效的匯率");
+    return;
+  }
+  state.fxRate = v;
+  state.fxDate = today();
+  saveState();
+  renderRate();
+  closeRateModal();
+  calculate({ silent: true });
+}
+
+function openFundModal() {
+  renderFundList();
+  clearFundForm();
+  $("fundModal").classList.add("show");
+}
+
+function closeFundModal() {
+  $("fundModal").classList.remove("show");
+  renderFundSelect();
+}
+
+function clearFundForm() {
+  $("fundName").value = "";
+  $("fundRate").value = "";
+  $("fundNav").value = "";
+  $("fundUrl").value = "";
+  $("fundCurrency").value = "USD";
+}
+
+function renderFundList() {
+  const list = $("fundList");
+  list.innerHTML = "";
+
+  if (!state.funds.length) {
+    list.innerHTML = '<div class="fund-item"><div class="fund-meta">尚未新增基金</div></div>';
+    return;
+  }
+
+  state.funds.forEach((f, i) => {
+    const div = document.createElement("div");
+    div.className = "fund-item";
+    const navText = isFinite(Number(f.nav)) && Number(f.nav) > 0
+      ? `淨值 ${Number(f.nav).toFixed(4)}${f.navDate ? `（${f.navDate}）` : ""}`
+      : "尚未設定淨值";
+    div.innerHTML = `
+      <div class="fund-item-top">
+        <div>
+          <div class="fund-name">${f.name}</div>
+          <div class="fund-meta">${f.currency || "USD"}｜每單位配息 ${f.rate}｜${navText}</div>
+        </div>
+        <button class="del-btn" title="刪除">×</button>
+      </div>
+    `;
+
+    div.querySelector(".del-btn").onclick = (e) => {
+      e.stopPropagation();
+      if (!confirm(`刪除基金「${f.name}」？`)) return;
+      state.funds.splice(i, 1);
+      if (state.selected === f.name && state.funds.length) state.selected = state.funds[0].name;
+      saveState();
+      renderFundList();
+    };
+
+    div.onclick = () => {
+      $("fundName").value = f.name;
+      $("fundRate").value = f.rate;
+      $("fundNav").value = isFinite(Number(f.nav)) ? f.nav : "";
+      $("fundUrl").value = f.url || "";
+      $("fundCurrency").value = f.currency || "USD";
+    };
+
+    list.appendChild(div);
+  });
+}
+
+function addFund() {
+  const name = $("fundName").value.trim();
+  const rate = parseNum($("fundRate").value);
+  const navStr = $("fundNav").value.trim();
+  const nav = navStr === "" ? NaN : parseNum(navStr);
+  const url = $("fundUrl").value.trim();
+  const currency = $("fundCurrency").value;
+
+  if (!name) { alert("請輸入基金名稱"); return; }
+  if (!isFinite(rate) || rate <= 0) { alert("請輸入有效的每單位配息"); return; }
+  if (navStr !== "" && (!isFinite(nav) || nav <= 0)) { alert("請輸入有效的淨值"); return; }
+
+  const existing = state.funds.findIndex(f => f.name === name);
+  if (existing >= 0) {
+    state.funds[existing] = {
+      ...state.funds[existing],
+      name,
+      rate,
+      currency,
+      url: url || undefined,
+      nav: isFinite(nav) ? nav : state.funds[existing].nav,
+      navDate: isFinite(nav) ? today() : state.funds[existing].navDate
+    };
+  } else {
+    state.funds.push({
+      name,
+      rate,
+      currency,
+      url: url || undefined,
+      nav: isFinite(nav) ? nav : undefined,
+      navDate: isFinite(nav) ? today() : undefined
+    });
+  }
+
+  state.selected = name;
+  saveState();
+  renderFundList();
+  clearFundForm();
+  renderFundSelect();
+}
+
+
+const AUTO_NAV_SOURCES = {
+  "DSP5（安聯收益成長 AM 美元）": {
+    navUrl: "https://invest.fubonlife.com.tw/w/wb/wb01_TLZ64-DSP5.djhtm",
+    distUrl: "https://invest.fubonlife.com.tw/w/wb/wb02.djhtm?a=TLZ64-DSP5"
+  },
+  "NGB1（高盛環球高收益 X 美元）": {
+    navUrl: "https://invest.fubonlife.com.tw/w/wb/wb01_ANZ89-NGB1.djhtm",
+    distUrl: "https://invest.fubonlife.com.tw/w/wb/wb05.djhtm?a=ANZ89-NGB1"
+  }
+};
+
+function setAutoStatus(text, mode = "") {
+  const el = $("autoStatus");
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove("ok", "fail");
+  if (mode) el.classList.add(mode);
+}
+
+function stripHtml(text) {
+  return String(text || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+async function fetchViaProxy(url) {
+  const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
+  const res = await fetch(proxyUrl, { cache: "no-store" });
+  if (!res.ok) throw new Error("proxy fetch failed");
+  return await res.text();
+}
+
+function extractFirstValidNumberAfterKeywords(text, keywords) {
+  const plain = stripHtml(text);
+  for (const keyword of keywords) {
+    const idx = plain.indexOf(keyword);
+    if (idx >= 0) {
+      const area = plain.slice(idx, idx + 500);
+      const nums = area.match(/\d+\.\d{2,6}/g);
+      if (nums && nums.length) {
+        const parsed = nums.map(Number).filter(n => isFinite(n) && n > 0 && n < 1000);
+        if (parsed.length) return parsed[0];
+      }
+    }
+  }
+
+  const nums = plain.match(/\d+\.\d{2,6}/g) || [];
+  const candidates = nums.map(Number).filter(n => isFinite(n) && n > 0 && n < 1000);
+  return candidates.length ? candidates[0] : NaN;
+}
+
+function extractDate(text) {
+  const plain = stripHtml(text);
+  const m = plain.match(/20\d{2}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}/);
+  if (!m) return today();
+  return m[0].replace(/[\/\.]/g, "-").replace(/-(\d)\b/g, "-0$1");
+}
+
+async function autoUpdateLatestFundData() {
+  const names = Object.keys(AUTO_NAV_SOURCES);
+  let updated = 0;
+  let failed = 0;
+
+  setAutoStatus("正在嘗試更新最新淨值與配息…");
+
+  for (const name of names) {
+    const fund = state.funds.find(f => f.name === name);
+    const src = AUTO_NAV_SOURCES[name];
+    if (!fund || !src) continue;
+
+    try {
+      const navHtml = await fetchViaProxy(src.navUrl);
+      const nav = extractFirstValidNumberAfterKeywords(navHtml, ["最新淨值", "淨值", "每單位淨值"]);
+      const navDate = extractDate(navHtml);
+
+      if (isFinite(nav) && nav > 0) {
+        fund.nav = nav;
+        fund.navDate = navDate;
+        fund.url = src.navUrl;
+        updated++;
+      }
+
+      try {
+        const distHtml = await fetchViaProxy(src.distUrl);
+        const dist = extractFirstValidNumberAfterKeywords(distHtml, ["每單位配息", "分配金額", "每受益權單位", "配息"]);
+        if (isFinite(dist) && dist > 0 && dist < 10) {
+          fund.rate = dist;
+        }
+      } catch (e) {}
+    } catch (e) {
+      failed++;
+    }
+  }
+
+  saveState();
+  renderFundSelect();
+  calculate({ silent: true });
+
+  if (updated > 0) {
+    setAutoStatus(`已嘗試更新 ${updated} 檔資料｜若數字異常請以官網為準`, "ok");
+  } else {
+    setAutoStatus("自動更新失敗：瀏覽器或資料來源可能阻擋抓取", "fail");
+  }
+}
+
+if ($("fundSelect")) {
+  $("fundSelect").addEventListener("change", (e) => {
+    state.selected = e.target.value;
+    saveState();
+    renderFundSlider();
+    syncFromFund(false);
+  });
+}
+
+$("principal").addEventListener("input", (e) => {
+  formatPrincipalInput(e);
+  calculate({ silent: true });
+});
+
+$("nav").addEventListener("input", () => {
+  calculate({ silent: true });
+});
+
+["rateModal"].forEach(id => {
+  $(id).addEventListener("click", (e) => {
+    if (e.target.id === id) e.currentTarget.classList.remove("show");
+  });
+});
+
+renderFundSelect();
+renderRate();
+calculate({ silent: true });
+autoUpdateLatestFundData();
+</script>
+</body>
+</html>
