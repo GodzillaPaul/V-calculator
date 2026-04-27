@@ -923,6 +923,7 @@ input::placeholder {
 
 
 <script>
+// Google Sheet source: https://docs.google.com/spreadsheets/d/1Ig0GGRg_JMC4n3jnhDWgaVp2ejB_sX2dL9XTDFye-2Y/edit?usp=sharing
 const STORAGE_KEY = "monthlyDividendStable.v1";
 const DEFAULT_STATE = {
   funds: [
@@ -1473,7 +1474,123 @@ async function autoUpdateLatestFundData() {
 }
 
 if ($("fundSelect")) {
-  $("fundSelect").addEventListener("change", (e) => {
+  
+const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1Ig0GGRg_JMC4n3jnhDWgaVp2ejB_sX2dL9XTDFye-2Y/gviz/tq?tqx=out:csv&sheet=工作表1";
+
+function parseCsvLine(line) {
+  const result = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const next = line[i + 1];
+
+    if (char === '"' && inQuotes && next === '"') {
+      current += '"';
+      i++;
+    } else if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === "," && !inQuotes) {
+      result.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  result.push(current.trim());
+  return result;
+}
+
+function parseCsv(text) {
+  const lines = String(text || "").trim().split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) return [];
+
+  const headers = parseCsvLine(lines[0]).map(h => h.trim());
+  return lines.slice(1).map(line => {
+    const cols = parseCsvLine(line);
+    const row = {};
+    headers.forEach((h, i) => {
+      row[h] = (cols[i] || "").trim();
+    });
+    return row;
+  });
+}
+
+function normalizeCode(name) {
+  return String(name || "").split("（")[0].trim();
+}
+
+function findSheetRowForFund(rows, fund) {
+  const code = normalizeCode(fund.name);
+  return rows.find(r =>
+    String(r.code || "").trim() === code ||
+    String(r.基金 || "").trim() === code ||
+    String(r.name || "").trim() === fund.name ||
+    String(r.基金名稱 || "").trim() === fund.name
+  );
+}
+
+function readSheetNumber(row, keys) {
+  for (const key of keys) {
+    if (row[key] !== undefined && row[key] !== "") {
+      const n = parseNum(row[key]);
+      if (isFinite(n)) return n;
+    }
+  }
+  return NaN;
+}
+
+async function updateFromGoogleSheet() {
+  setAutoStatus("正在讀取 Google Sheet 最新資料…");
+
+  try {
+    const res = await fetch(GOOGLE_SHEET_CSV_URL + "&cacheBust=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) throw new Error("Google Sheet 讀取失敗");
+
+    const csv = await res.text();
+    const rows = parseCsv(csv);
+    let updated = 0;
+
+    state.funds.forEach(fund => {
+      const row = findSheetRowForFund(rows, fund);
+      if (!row) return;
+
+      const nav = readSheetNumber(row, ["nav", "淨值", "最新淨值"]);
+      const dividend = readSheetNumber(row, ["dividend", "配息", "每單位配息", "每單位配息金額"]);
+      const date = row.date || row.日期 || row.navDate || row.更新日期 || today();
+      const currency = row.currency || row.幣別 || fund.currency;
+
+      if (isFinite(nav) && nav > 0) {
+        fund.nav = nav;
+        fund.navDate = date;
+        updated++;
+      }
+
+      if (isFinite(dividend) && dividend > 0) {
+        fund.rate = dividend;
+      }
+
+      if (currency) fund.currency = currency;
+    });
+
+    if (updated > 0) {
+      saveState();
+      renderFundSelect();
+      calculate({ silent: true });
+      setAutoStatus(`已從 Google Sheet 更新 ${updated} 檔資料`, "ok");
+    } else {
+      setAutoStatus("Google Sheet 有讀到，但欄位或代碼沒有對上", "fail");
+    }
+  } catch (err) {
+    console.log(err);
+    setAutoStatus("Google Sheet 讀取失敗：請確認已發佈到網路或開放讀取", "fail");
+  }
+}
+
+
+$("fundSelect").addEventListener("change", (e) => {
     state.selected = e.target.value;
     saveState();
     renderFundSlider();
@@ -1499,7 +1616,7 @@ $("nav").addEventListener("input", () => {
 renderFundSelect();
 renderRate();
 calculate({ silent: true });
-setAutoStatus("已使用內建資料｜避免瀏覽器誤抓造成數字錯誤", "ok");
+updateFromGoogleSheet();
 </script>
 </body>
 </html>
