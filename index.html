@@ -980,9 +980,11 @@ function sanitizeState() {
       }
     }
 
-    if (!isFinite(Number(f.rate)) || Number(f.rate) <= 0 || Number(f.rate) > 10) {
-      const def = DEFAULT_STATE.funds.find(d => d.name === f.name);
-      if (def) f.rate = def.rate;
+    // 提解率永遠以 DEFAULT_STATE 為準（hardcode 在程式裡）
+    // 不從 Sheet 讀，也不採信 localStorage 裡的快取，避免被舊版誤更新
+    const defForRate = DEFAULT_STATE.funds.find(d => d.name === f.name);
+    if (defForRate && isFinite(Number(defForRate.rate)) && Number(defForRate.rate) > 0) {
+      f.rate = defForRate.rate;
     }
   });
   if (!isFinite(Number(state.fxRate)) || state.fxRate <= 0 || state.fxRate > 100) {
@@ -1317,11 +1319,35 @@ function parseCsvLine(line) {
 }
 
 function parseCsv(text) {
-  const lines = String(text || "").trim().split(/\r?\n/).filter(Boolean);
-  if (lines.length < 2) return [];
+  const allLines = String(text || "").split(/\r?\n/).filter(l => l.trim().length > 0);
+  if (allLines.length < 1) return [];
 
-  const headers = parseCsvLine(lines[0]).map(h => h.trim());
-  return lines.slice(1).map(line => {
+  // 自動尋找表頭那一列（前 15 列裡找最像表頭的：欄位數 ≥ 2 且含關鍵字）
+  const headerKeywords = [
+    "code", "nav", "rate", "dividend", "date", "currency",
+    "基金", "代碼", "淨值", "配息", "日期", "幣別",
+    "保單", "宣告", "更新", "標的", "name"
+  ];
+  let headerIdx = 0;
+  let bestScore = -1;
+  for (let i = 0; i < Math.min(allLines.length, 15); i++) {
+    const cols = parseCsvLine(allLines[i]);
+    if (cols.length < 2) continue; // 表頭至少要有兩欄
+    const lower = allLines[i].toLowerCase();
+    let hits = 0;
+    for (const k of headerKeywords) {
+      if (lower.indexOf(k.toLowerCase()) >= 0) hits++;
+    }
+    // 給分：關鍵字命中 × 2 + 欄位數
+    const score = hits * 2 + cols.length;
+    if (hits >= 1 && score > bestScore) {
+      bestScore = score;
+      headerIdx = i;
+    }
+  }
+
+  const headers = parseCsvLine(allLines[headerIdx]).map(h => h.trim());
+  return allLines.slice(headerIdx + 1).map(line => {
     const cols = parseCsvLine(line);
     const row = {};
     headers.forEach((h, i) => {
@@ -1332,18 +1358,51 @@ function parseCsv(text) {
 }
 
 function normalizeCode(name) {
-  return String(name || "").split("（")[0].trim();
+  return String(name || "").split("（")[0].split("(")[0].trim();
+}
+
+function normalizeDate(s) {
+  if (!s) return "";
+  const m = String(s).match(/(\d{4})[\/\-年\.](\d{1,2})[\/\-月\.](\d{1,2})/);
+  if (m) {
+    const yyyy = m[1];
+    const mm = String(parseInt(m[2], 10)).padStart(2, "0");
+    const dd = String(parseInt(m[3], 10)).padStart(2, "0");
+    return yyyy + "-" + mm + "-" + dd;
+  }
+  return String(s).trim();
 }
 
 function findSheetRowForFund(rows, fund) {
-  const code = normalizeCode(fund.name);
-  return rows.find(r =>
-    String(r.code || "").trim() === code ||
-    String(r["基金"] || "").trim() === code ||
-    String(r["基金代碼"] || "").trim() === code ||
-    String(r.name || "").trim() === fund.name ||
-    String(r["基金名稱"] || "").trim() === fund.name
-  );
+  const code = normalizeCode(fund.name).toUpperCase();
+  if (!code) return null;
+  // 完全比對優先；找不到再用包含比對（讓 TLZ64-DSP5 也能對上 DSP5）
+  const codeFields = ["code", "基金", "基金代碼", "基金/保單代碼", "保單代碼", "代碼"];
+  const nameFields = ["name", "基金名稱", "標的名稱"];
+
+  let exact = rows.find(r => {
+    for (const k of codeFields) {
+      const v = String(r[k] || "").trim().toUpperCase();
+      if (v && v === code) return true;
+    }
+    for (const k of nameFields) {
+      if (String(r[k] || "").trim() === fund.name) return true;
+    }
+    return false;
+  });
+  if (exact) return exact;
+
+  return rows.find(r => {
+    for (const k of codeFields) {
+      const v = String(r[k] || "").trim().toUpperCase();
+      if (v && v.indexOf(code) >= 0) return true;
+    }
+    for (const k of nameFields) {
+      const v = String(r[k] || "").trim();
+      if (v && v.indexOf(code) >= 0) return true;
+    }
+    return false;
+  });
 }
 
 function readSheetValue(row, keys) {
@@ -1384,19 +1443,29 @@ async function updateFromGoogleSheet() {
       const row = findSheetRowForFund(rows, fund);
       if (!row) return;
 
-      const nav = readSheetNumber(row, ["nav", "淨值", "最新淨值"]);
-      const dividend = readSheetNumber(row, ["dividend", "rate", "配息", "每單位配息", "每單位配息金額"]);
-      const date = readSheetValue(row, ["date", "日期", "navDate", "更新日期"]);
-      const currency = readSheetValue(row, ["currency", "幣別"]);
+      // 只抓淨值（提解率 hardcode 在 DEFAULT_STATE 不從 Sheet 讀）
+      let parsedNav = readSheetNumber(row, ["nav", "淨值", "最新淨值", "即時淨值"]);
 
-      if (isFinite(nav) && nav > 0) {
-        fund.nav = nav;
-        fund.navDate = date || today();
-        updated++;
+      // 合併欄「即時淨值/宣告利率」如果是純數字（沒 % 也沒「利率」字樣）才當淨值
+      if (!isFinite(parsedNav) || parsedNav <= 0) {
+        const mergedKeys = ["即時淨值/宣告利率", "淨值/利率", "淨值/宣告利率"];
+        for (const k of mergedKeys) {
+          const raw = String(row[k] || "").trim();
+          if (!raw) continue;
+          const isPercent = raw.indexOf("%") >= 0 || raw.indexOf("％") >= 0 || raw.indexOf("利率") >= 0;
+          if (isPercent) continue;
+          const n = parseNum(raw);
+          if (isFinite(n) && n > 0) { parsedNav = n; break; }
+        }
       }
 
-      if (isFinite(dividend) && dividend > 0) {
-        fund.rate = dividend;
+      const date = normalizeDate(readSheetValue(row, ["date", "日期", "navDate", "更新日期"]));
+      const currency = readSheetValue(row, ["currency", "幣別"]);
+
+      if (isFinite(parsedNav) && parsedNav > 0) {
+        fund.nav = parsedNav;
+        fund.navDate = date || today();
+        updated++;
       }
 
       if (currency) fund.currency = currency;
@@ -1404,14 +1473,18 @@ async function updateFromGoogleSheet() {
 
     // 順便支援匯率列：如果有一列代碼是 FX 或 USD/TWD
     const fxRow = rows.find(r => {
-      const code = String(r.code || r["基金"] || r["基金代碼"] || "").trim().toUpperCase();
-      return code === "FX" || code === "USD/TWD" || code === "USDTWD";
+      const codeFields = ["code", "基金", "基金代碼", "基金/保單代碼", "保單代碼", "代碼"];
+      for (const k of codeFields) {
+        const v = String(r[k] || "").trim().toUpperCase();
+        if (v === "FX" || v === "USD/TWD" || v === "USDTWD") return true;
+      }
+      return false;
     });
     if (fxRow) {
-      const fx = readSheetNumber(fxRow, ["nav", "rate", "匯率", "fxRate"]);
+      let fx = readSheetNumber(fxRow, ["nav", "rate", "匯率", "fxRate", "即時淨值", "即時淨值/宣告利率"]);
       if (isFinite(fx) && fx > 0 && fx < 100) {
         state.fxRate = fx;
-        state.fxDate = readSheetValue(fxRow, ["date", "日期"]) || today();
+        state.fxDate = normalizeDate(readSheetValue(fxRow, ["date", "日期", "更新日期"])) || today();
         fxUpdated = true;
       }
     }
@@ -1424,9 +1497,9 @@ async function updateFromGoogleSheet() {
 
     if (updated > 0 || fxUpdated) {
       const parts = [];
-      if (updated > 0) parts.push(`已更新 ${updated} 檔基金`);
+      if (updated > 0) parts.push(`淨值 ${updated} 檔`);
       if (fxUpdated) parts.push("匯率");
-      setAutoStatus("✓ " + parts.join("｜") + "（點此重抓）", "ok");
+      setAutoStatus("✓ 已更新 " + parts.join("｜") + "（點此重抓）", "ok");
     } else {
       setAutoStatus("Sheet 有讀到，但欄位或代碼沒對上（點此重試）", "fail");
     }
