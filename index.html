@@ -640,7 +640,11 @@ select:focus {
   font-size: 11px;
   font-weight: 700;
   box-shadow: 0 10px 24px -20px rgba(47,91,170,.45);
+  cursor: pointer;
+  user-select: none;
+  transition: transform .18s ease;
 }
+.auto-status:active { transform: scale(.97); }
 .auto-status.ok { color: #2f80ed; }
 .auto-status.fail { color: #dc2626; }
 
@@ -816,7 +820,7 @@ input::placeholder {
       <div class="brand-eyebrow"><span class="brand-dot"></span>Premium Dividend Tool</div>
       <h1>月配息計算機</h1>
       <div class="subtitle">輸入金額即時試算，讓現金流自己說話。</div>
-      <div class="auto-status" id="autoStatus">正在嘗試更新最新資料…</div>
+      <div class="auto-status" id="autoStatus" title="點一下手動重新抓取 Google Sheet">正在嘗試更新最新資料…</div>
     </div>
 
     <button class="fx-tag" onclick="openRateModal()" aria-label="更新匯率">
@@ -833,7 +837,7 @@ input::placeholder {
       </div>
       <div class="fund-row">
         <select id="fundSelect"></select>
-        
+
       </div>
     </div>
 
@@ -923,7 +927,14 @@ input::placeholder {
 
 
 <script>
-// Google Sheet source: https://docs.google.com/spreadsheets/d/1Ig0GGRg_JMC4n3jnhDWgaVp2ejB_sX2dL9XTDFye-2Y/edit?usp=sharing
+// ===== 設定 =====
+// Google Sheet 來源（請確認 Sheet 已設為「知道連結的任何人都可以檢視」或「發佈到網路」）
+const GOOGLE_SHEET_ID = "1Ig0GGRg_JMC4n3jnhDWgaVp2ejB_sX2dL9XTDFye-2Y";
+const GOOGLE_SHEET_NAME = "工作表1";
+const GOOGLE_SHEET_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/" + GOOGLE_SHEET_ID +
+  "/gviz/tq?tqx=out:csv&sheet=" + encodeURIComponent(GOOGLE_SHEET_NAME);
+
 const STORAGE_KEY = "monthlyDividendStable.v1";
 const DEFAULT_STATE = {
   funds: [
@@ -937,15 +948,21 @@ const DEFAULT_STATE = {
   selected: "DSP5（安聯收益成長 AM 美元）"
 };
 
+// ===== 狀態載入與健檢 =====
+function cloneDefault() {
+  return JSON.parse(JSON.stringify(DEFAULT_STATE));
+}
+
 function loadState() {
+  let s;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return JSON.parse(JSON.stringify(DEFAULT_STATE));
-    const s = JSON.parse(raw);
-    return { ...JSON.parse(JSON.stringify(DEFAULT_STATE)), ...s };
+    if (!raw) return cloneDefault();
+    s = JSON.parse(raw);
   } catch (e) {
-    return JSON.parse(JSON.stringify(DEFAULT_STATE));
+    return cloneDefault();
   }
+  return { ...cloneDefault(), ...s };
 }
 
 let state = loadState();
@@ -971,6 +988,9 @@ function sanitizeState() {
       if (def) f.rate = def.rate;
     }
   });
+  if (!isFinite(Number(state.fxRate)) || state.fxRate <= 0 || state.fxRate > 100) {
+    state.fxRate = DEFAULT_STATE.fxRate;
+  }
 }
 sanitizeState();
 
@@ -978,10 +998,12 @@ let breakdownOpen = false;
 let lastDisplayedMonthly = 0;
 let countTimer = null;
 
+// ===== 工具函式 =====
 const $ = (id) => document.getElementById(id);
 const today = () => new Date().toISOString().slice(0, 10);
 const escapeAttr = (s) => String(s || "").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-const normalizeDigits = (s) => String(s ?? "").replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 65248));
+const normalizeDigits = (s) => String(s == null ? "" : s).replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 65248));
+
 const parseNum = (s) => {
   s = normalizeDigits(s);
   const cleaned = s.replace(/,/g, "").replace(/[^0-9.\-]/g, "").trim();
@@ -992,10 +1014,12 @@ const parseNum = (s) => {
   const n = parseFloat(normalized);
   return isFinite(n) ? n : NaN;
 };
+
 const fmt = (n, dp = 2) => {
   if (!isFinite(n)) return "—";
   return Number(n).toLocaleString("en-US", { minimumFractionDigits: dp, maximumFractionDigits: dp });
 };
+
 const fmt0 = (n) => {
   if (!isFinite(n)) return "—";
   return Math.round(Number(n)).toLocaleString("en-US");
@@ -1006,16 +1030,15 @@ function saveState() {
 }
 
 function feeRate(twd) {
-  if (twd < 2_000_000) return 0.05;
-  if (twd < 5_000_000) return 0.04;
-  if (twd < 10_000_000) return 0.03;
+  if (twd < 2000000) return 0.05;
+  if (twd < 5000000) return 0.04;
+  if (twd < 10000000) return 0.03;
   return 0.02;
 }
 
 function getSelectedFund() {
   return state.funds.find(f => f.name === state.selected) || state.funds[0];
 }
-
 
 function getFundCode(name) {
   const m = String(name || "").match(/^([^（\s]+)/);
@@ -1029,6 +1052,7 @@ function getFundShortTitle(name) {
   return s.replace(/^([^（\s]+)/, "").replace(/[（）]/g, "").trim() || s;
 }
 
+// ===== 渲染 =====
 function renderFundSlider() {
   const slider = $("fundSlider");
   if (!slider) return;
@@ -1089,7 +1113,7 @@ function renderRate() {
   $("rateDisplay").textContent = Number(state.fxRate).toFixed(3);
 }
 
-function syncFromFund(skipFlash = false) {
+function syncFromFund(skipFlash) {
   const fund = getSelectedFund();
   if (!fund) return;
 
@@ -1116,7 +1140,7 @@ function syncFromFund(skipFlash = false) {
 }
 
 function formatPrincipalInput(e) {
-  const val = e.target.value.replace(/[^\d]/g, "");
+  const val = normalizeDigits(e.target.value).replace(/[^\d]/g, "");
   e.target.value = val ? Number(val).toLocaleString("en-US") : "";
 }
 
@@ -1150,7 +1174,8 @@ function animateNumber(target) {
   countTimer = requestAnimationFrame(tick);
 }
 
-function calculate(options = {}) {
+function calculate(options) {
+  options = options || {};
   clearErr();
 
   const principal = parseNum($("principal").value);
@@ -1258,125 +1283,8 @@ function saveRate() {
   calculate({ silent: true });
 }
 
-function openFundModal() {
-  renderFundList();
-  clearFundForm();
-  $("fundModal").classList.add("show");
-}
-
-function closeFundModal() {
-  $("fundModal").classList.remove("show");
-  renderFundSelect();
-}
-
-function clearFundForm() {
-  $("fundName").value = "";
-  $("fundRate").value = "";
-  $("fundNav").value = "";
-  $("fundUrl").value = "";
-  $("fundCurrency").value = "USD";
-}
-
-function renderFundList() {
-  const list = $("fundList");
-  list.innerHTML = "";
-
-  if (!state.funds.length) {
-    list.innerHTML = '<div class="fund-item"><div class="fund-meta">尚未新增基金</div></div>';
-    return;
-  }
-
-  state.funds.forEach((f, i) => {
-    const div = document.createElement("div");
-    div.className = "fund-item";
-    const navText = isFinite(Number(f.nav)) && Number(f.nav) > 0
-      ? `淨值 ${Number(f.nav).toFixed(4)}${f.navDate ? `（${f.navDate}）` : ""}`
-      : "尚未設定淨值";
-    div.innerHTML = `
-      <div class="fund-item-top">
-        <div>
-          <div class="fund-name">${f.name}</div>
-          <div class="fund-meta">${f.currency || "USD"}｜每單位配息 ${f.rate}｜${navText}</div>
-        </div>
-        <button class="del-btn" title="刪除">×</button>
-      </div>
-    `;
-
-    div.querySelector(".del-btn").onclick = (e) => {
-      e.stopPropagation();
-      if (!confirm(`刪除基金「${f.name}」？`)) return;
-      state.funds.splice(i, 1);
-      if (state.selected === f.name && state.funds.length) state.selected = state.funds[0].name;
-      saveState();
-      renderFundList();
-    };
-
-    div.onclick = () => {
-      $("fundName").value = f.name;
-      $("fundRate").value = f.rate;
-      $("fundNav").value = isFinite(Number(f.nav)) ? f.nav : "";
-      $("fundUrl").value = f.url || "";
-      $("fundCurrency").value = f.currency || "USD";
-    };
-
-    list.appendChild(div);
-  });
-}
-
-function addFund() {
-  const name = $("fundName").value.trim();
-  const rate = parseNum($("fundRate").value);
-  const navStr = $("fundNav").value.trim();
-  const nav = navStr === "" ? NaN : parseNum(navStr);
-  const url = $("fundUrl").value.trim();
-  const currency = $("fundCurrency").value;
-
-  if (!name) { alert("請輸入基金名稱"); return; }
-  if (!isFinite(rate) || rate <= 0) { alert("請輸入有效的每單位配息"); return; }
-  if (navStr !== "" && (!isFinite(nav) || nav <= 0)) { alert("請輸入有效的淨值"); return; }
-
-  const existing = state.funds.findIndex(f => f.name === name);
-  if (existing >= 0) {
-    state.funds[existing] = {
-      ...state.funds[existing],
-      name,
-      rate,
-      currency,
-      url: url || undefined,
-      nav: isFinite(nav) ? nav : state.funds[existing].nav,
-      navDate: isFinite(nav) ? today() : state.funds[existing].navDate
-    };
-  } else {
-    state.funds.push({
-      name,
-      rate,
-      currency,
-      url: url || undefined,
-      nav: isFinite(nav) ? nav : undefined,
-      navDate: isFinite(nav) ? today() : undefined
-    });
-  }
-
-  state.selected = name;
-  saveState();
-  renderFundList();
-  clearFundForm();
-  renderFundSelect();
-}
-
-
-const AUTO_NAV_SOURCES = {
-  "DSP5（安聯收益成長 AM 美元）": {
-    navUrl: "https://invest.fubonlife.com.tw/w/wb/wb01_TLZ64-DSP5.djhtm",
-    distUrl: "https://invest.fubonlife.com.tw/w/wb/wb02.djhtm?a=TLZ64-DSP5"
-  },
-  "NGB1（高盛環球高收益 X 美元）": {
-    navUrl: "https://invest.fubonlife.com.tw/w/wb/wb01_ANZ89-NGB1.djhtm",
-    distUrl: "https://invest.fubonlife.com.tw/w/wb/wb05.djhtm?a=ANZ89-NGB1"
-  }
-};
-
-function setAutoStatus(text, mode = "") {
+// ===== 狀態列 =====
+function setAutoStatus(text, mode) {
   const el = $("autoStatus");
   if (!el) return;
   el.textContent = text;
@@ -1384,99 +1292,7 @@ function setAutoStatus(text, mode = "") {
   if (mode) el.classList.add(mode);
 }
 
-function stripHtml(text) {
-  return String(text || "")
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\s+/g, " ");
-}
-
-async function fetchViaProxy(url) {
-  const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
-  const res = await fetch(proxyUrl, { cache: "no-store" });
-  if (!res.ok) throw new Error("proxy fetch failed");
-  return await res.text();
-}
-
-function extractFirstValidNumberAfterKeywords(text, keywords) {
-  const plain = stripHtml(text);
-  for (const keyword of keywords) {
-    const idx = plain.indexOf(keyword);
-    if (idx >= 0) {
-      const area = plain.slice(idx, idx + 500);
-      const nums = area.match(/\d+\.\d{2,6}/g);
-      if (nums && nums.length) {
-        const parsed = nums.map(Number).filter(n => isFinite(n) && n > 0 && n < 1000);
-        if (parsed.length) return parsed[0];
-      }
-    }
-  }
-
-  const nums = plain.match(/\d+\.\d{2,6}/g) || [];
-  const candidates = nums.map(Number).filter(n => isFinite(n) && n > 0 && n < 1000);
-  return candidates.length ? candidates[0] : NaN;
-}
-
-function extractDate(text) {
-  const plain = stripHtml(text);
-  const m = plain.match(/20\d{2}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}/);
-  if (!m) return today();
-  return m[0].replace(/[\/\.]/g, "-").replace(/-(\d)\b/g, "-0$1");
-}
-
-async function autoUpdateLatestFundData() {
-  const names = Object.keys(AUTO_NAV_SOURCES);
-  let updated = 0;
-  let failed = 0;
-
-  setAutoStatus("正在嘗試更新最新淨值與配息…");
-
-  for (const name of names) {
-    const fund = state.funds.find(f => f.name === name);
-    const src = AUTO_NAV_SOURCES[name];
-    if (!fund || !src) continue;
-
-    try {
-      const navHtml = await fetchViaProxy(src.navUrl);
-      const nav = extractFirstValidNumberAfterKeywords(navHtml, ["最新淨值", "淨值", "每單位淨值"]);
-      const navDate = extractDate(navHtml);
-
-      if (isFinite(nav) && nav > 0) {
-        fund.nav = nav;
-        fund.navDate = navDate;
-        fund.url = src.navUrl;
-        updated++;
-      }
-
-      try {
-        const distHtml = await fetchViaProxy(src.distUrl);
-        const dist = extractFirstValidNumberAfterKeywords(distHtml, ["每單位配息", "分配金額", "每受益權單位", "配息"]);
-        if (isFinite(dist) && dist > 0 && dist < 10) {
-          fund.rate = dist;
-        }
-      } catch (e) {}
-    } catch (e) {
-      failed++;
-    }
-  }
-
-  saveState();
-  renderFundSelect();
-  calculate({ silent: true });
-
-  if (updated > 0) {
-    setAutoStatus(`已嘗試更新 ${updated} 檔資料｜若數字異常請以官網為準`, "ok");
-  } else {
-    setAutoStatus("自動更新失敗：瀏覽器或資料來源可能阻擋抓取", "fail");
-  }
-}
-
-if ($("fundSelect")) {
-  
-const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1Ig0GGRg_JMC4n3jnhDWgaVp2ejB_sX2dL9XTDFye-2Y/gviz/tq?tqx=out:csv&sheet=工作表1";
-
+// ===== Google Sheet 自動更新 =====
 function parseCsvLine(line) {
   const result = [];
   let current = "";
@@ -1526,10 +1342,18 @@ function findSheetRowForFund(rows, fund) {
   const code = normalizeCode(fund.name);
   return rows.find(r =>
     String(r.code || "").trim() === code ||
-    String(r.基金 || "").trim() === code ||
+    String(r["基金"] || "").trim() === code ||
+    String(r["基金代碼"] || "").trim() === code ||
     String(r.name || "").trim() === fund.name ||
-    String(r.基金名稱 || "").trim() === fund.name
+    String(r["基金名稱"] || "").trim() === fund.name
   );
+}
+
+function readSheetValue(row, keys) {
+  for (const key of keys) {
+    if (row[key] !== undefined && row[key] !== "") return row[key];
+  }
+  return "";
 }
 
 function readSheetNumber(row, keys) {
@@ -1547,24 +1371,30 @@ async function updateFromGoogleSheet() {
 
   try {
     const res = await fetch(GOOGLE_SHEET_CSV_URL + "&cacheBust=" + Date.now(), { cache: "no-store" });
-    if (!res.ok) throw new Error("Google Sheet 讀取失敗");
+    if (!res.ok) throw new Error("Google Sheet 讀取失敗 (HTTP " + res.status + ")");
 
     const csv = await res.text();
     const rows = parseCsv(csv);
+    if (!rows.length) {
+      setAutoStatus("Google Sheet 沒有讀到任何資料列", "fail");
+      return;
+    }
+
     let updated = 0;
+    let fxUpdated = false;
 
     state.funds.forEach(fund => {
       const row = findSheetRowForFund(rows, fund);
       if (!row) return;
 
       const nav = readSheetNumber(row, ["nav", "淨值", "最新淨值"]);
-      const dividend = readSheetNumber(row, ["dividend", "配息", "每單位配息", "每單位配息金額"]);
-      const date = row.date || row.日期 || row.navDate || row.更新日期 || today();
-      const currency = row.currency || row.幣別 || fund.currency;
+      const dividend = readSheetNumber(row, ["dividend", "rate", "配息", "每單位配息", "每單位配息金額"]);
+      const date = readSheetValue(row, ["date", "日期", "navDate", "更新日期"]);
+      const currency = readSheetValue(row, ["currency", "幣別"]);
 
       if (isFinite(nav) && nav > 0) {
         fund.nav = nav;
-        fund.navDate = date;
+        fund.navDate = date || today();
         updated++;
       }
 
@@ -1575,28 +1405,47 @@ async function updateFromGoogleSheet() {
       if (currency) fund.currency = currency;
     });
 
-    if (updated > 0) {
-      saveState();
-      renderFundSelect();
-      calculate({ silent: true });
-      setAutoStatus(`已從 Google Sheet 更新 ${updated} 檔資料`, "ok");
+    // 順便支援匯率列：如果有一列代碼是 FX 或 USD/TWD
+    const fxRow = rows.find(r => {
+      const code = String(r.code || r["基金"] || r["基金代碼"] || "").trim().toUpperCase();
+      return code === "FX" || code === "USD/TWD" || code === "USDTWD";
+    });
+    if (fxRow) {
+      const fx = readSheetNumber(fxRow, ["nav", "rate", "匯率", "fxRate"]);
+      if (isFinite(fx) && fx > 0 && fx < 100) {
+        state.fxRate = fx;
+        state.fxDate = readSheetValue(fxRow, ["date", "日期"]) || today();
+        fxUpdated = true;
+      }
+    }
+
+    sanitizeState();
+    saveState();
+    renderFundSelect();
+    renderRate();
+    calculate({ silent: true });
+
+    if (updated > 0 || fxUpdated) {
+      const parts = [];
+      if (updated > 0) parts.push(`已更新 ${updated} 檔基金`);
+      if (fxUpdated) parts.push("匯率");
+      setAutoStatus("✓ " + parts.join("｜") + "（點此重抓）", "ok");
     } else {
-      setAutoStatus("Google Sheet 有讀到，但欄位或代碼沒有對上", "fail");
+      setAutoStatus("Sheet 有讀到，但欄位或代碼沒對上（點此重試）", "fail");
     }
   } catch (err) {
     console.log(err);
-    setAutoStatus("Google Sheet 讀取失敗：請確認已發佈到網路或開放讀取", "fail");
+    setAutoStatus("Google Sheet 讀取失敗（點此重試）：" + (err && err.message ? err.message : ""), "fail");
   }
 }
 
-
+// ===== 事件綁定 =====
 $("fundSelect").addEventListener("change", (e) => {
-    state.selected = e.target.value;
-    saveState();
-    renderFundSlider();
-    syncFromFund(false);
-  });
-}
+  state.selected = e.target.value;
+  saveState();
+  renderFundSlider();
+  syncFromFund(false);
+});
 
 $("principal").addEventListener("input", (e) => {
   formatPrincipalInput(e);
@@ -1613,6 +1462,12 @@ $("nav").addEventListener("input", () => {
   });
 });
 
+// 點狀態列可以手動重新抓
+$("autoStatus").addEventListener("click", () => {
+  updateFromGoogleSheet();
+});
+
+// ===== 啟動 =====
 renderFundSelect();
 renderRate();
 calculate({ silent: true });
