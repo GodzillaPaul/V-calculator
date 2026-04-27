@@ -928,12 +928,9 @@ input::placeholder {
 
 <script>
 // ===== 設定 =====
-// Google Sheet 來源（請確認 Sheet 已設為「知道連結的任何人都可以檢視」或「發佈到網路」）
-const GOOGLE_SHEET_ID = "1Ig0GGRg_JMC4n3jnhDWgaVp2ejB_sX2dL9XTDFye-2Y";
-const GOOGLE_SHEET_NAME = "工作表1";
+// Google Sheet「發佈到網路」CSV 網址（這個有 CORS header，從 file:// 也能 fetch）
 const GOOGLE_SHEET_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/" + GOOGLE_SHEET_ID +
-  "/gviz/tq?tqx=out:csv&sheet=" + encodeURIComponent(GOOGLE_SHEET_NAME);
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vTlWEVTc0tmVbJfFWoKfOIIjmFDeiBKCqQGtgflSfV280ul1EjXP-1UexQORI1dUt0cZsIQnKoQmJgp/pub?gid=971675466&single=true&output=csv";
 
 const STORAGE_KEY = "monthlyDividendStable.v1";
 const DEFAULT_STATE = {
