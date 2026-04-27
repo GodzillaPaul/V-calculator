@@ -2,7 +2,6 @@
 <html lang="zh-Hant">
 <head>
 
-<!-- Favicon -->
 <link rel="icon" href="favicon.ico">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon_32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon_16.png">
@@ -12,7 +11,7 @@
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>月配息計算機｜Premium Dividend Master</title>
+<title>月配息計算機｜跨瀏覽器穩定版</title>
 <style>
 :root {
   --ink: #1f2937;
@@ -924,7 +923,7 @@ input::placeholder {
 
 
 <script>
-const STORAGE_KEY = "monthlyDividendPremium.v1";
+const STORAGE_KEY = "monthlyDividendStable.v1";
 const DEFAULT_STATE = {
   funds: [
     { name: "DSP5（安聯收益成長 AM 美元）", rate: 0.055, nav: 8.5978, navDate: "2026-04-23", currency: "USD", url: "https://invest.fubonlife.com.tw/w/wb/wb02.djhtm?a=TLZ64-DSP5" },
@@ -940,15 +939,40 @@ const DEFAULT_STATE = {
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return structuredClone(DEFAULT_STATE);
+    if (!raw) return JSON.parse(JSON.stringify(DEFAULT_STATE));
     const s = JSON.parse(raw);
-    return { ...structuredClone(DEFAULT_STATE), ...s };
+    return { ...JSON.parse(JSON.stringify(DEFAULT_STATE)), ...s };
   } catch (e) {
-    return structuredClone(DEFAULT_STATE);
+    return JSON.parse(JSON.stringify(DEFAULT_STATE));
   }
 }
 
 let state = loadState();
+
+function sanitizeState() {
+  state.funds.forEach(f => {
+    const code = String(f.name || "");
+    let min = 0.1, max = 1000;
+    if (code.indexOf("DSP5") >= 0 || code.indexOf("FBD6") >= 0) { min = 5; max = 25; }
+    if (code.indexOf("NGB1") >= 0 || code.indexOf("NGB2") >= 0) { min = 20; max = 90; }
+
+    if (!isFinite(Number(f.nav)) || Number(f.nav) < min || Number(f.nav) > max) {
+      const def = DEFAULT_STATE.funds.find(d => d.name === f.name);
+      if (def) {
+        f.nav = def.nav;
+        f.rate = def.rate;
+        f.navDate = def.navDate;
+      }
+    }
+
+    if (!isFinite(Number(f.rate)) || Number(f.rate) <= 0 || Number(f.rate) > 10) {
+      const def = DEFAULT_STATE.funds.find(d => d.name === f.name);
+      if (def) f.rate = def.rate;
+    }
+  });
+}
+sanitizeState();
+
 let breakdownOpen = false;
 let lastDisplayedMonthly = 0;
 let countTimer = null;
@@ -956,13 +980,25 @@ let countTimer = null;
 const $ = (id) => document.getElementById(id);
 const today = () => new Date().toISOString().slice(0, 10);
 const escapeAttr = (s) => String(s || "").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+const normalizeDigits = (s) => String(s ?? "").replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 65248));
 const parseNum = (s) => {
-  if (typeof s !== "string") s = String(s ?? "");
-  const n = parseFloat(s.replace(/,/g, "").trim());
+  s = normalizeDigits(s);
+  const cleaned = s.replace(/,/g, "").replace(/[^0-9.\-]/g, "").trim();
+  const firstDot = cleaned.indexOf(".");
+  const normalized = firstDot >= 0
+    ? cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, "")
+    : cleaned;
+  const n = parseFloat(normalized);
   return isFinite(n) ? n : NaN;
 };
-const fmt = (n, dp = 2) => isFinite(n) ? n.toLocaleString("zh-TW", { minimumFractionDigits: dp, maximumFractionDigits: dp }) : "—";
-const fmt0 = (n) => isFinite(n) ? n.toLocaleString("zh-TW", { maximumFractionDigits: 0 }) : "—";
+const fmt = (n, dp = 2) => {
+  if (!isFinite(n)) return "—";
+  return Number(n).toLocaleString("en-US", { minimumFractionDigits: dp, maximumFractionDigits: dp });
+};
+const fmt0 = (n) => {
+  if (!isFinite(n)) return "—";
+  return Math.round(Number(n)).toLocaleString("en-US");
+};
 
 function saveState() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
@@ -1020,10 +1056,14 @@ function renderFundSlider() {
       renderFundSlider();
       syncFromFund(false);
 
-      const active = document.querySelector(`.fund-card[data-fund="${CSS.escape(f.name)}"]`);
+      const active = Array.from(document.querySelectorAll(".fund-card")).find(el => el.dataset.fund === f.name);
       if (active) {
         active.classList.add("just-selected");
-        active.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        try {
+          active.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        } catch (e) {
+          active.scrollIntoView();
+        }
         setTimeout(() => active.classList.remove("just-selected"), 600);
       }
 
@@ -1459,7 +1499,7 @@ $("nav").addEventListener("input", () => {
 renderFundSelect();
 renderRate();
 calculate({ silent: true });
-autoUpdateLatestFundData();
+setAutoStatus("已使用內建資料｜避免瀏覽器誤抓造成數字錯誤", "ok");
 </script>
 </body>
 </html>
