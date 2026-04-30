@@ -938,7 +938,8 @@ const DEFAULT_STATE = {
     { name: "DSP5（安聯收益成長 AM 美元）", rate: 0.055, nav: 8.5978, navDate: "2026-04-23", currency: "USD", url: "https://invest.fubonlife.com.tw/w/wb/wb02.djhtm?a=TLZ64-DSP5" },
     { name: "NGB1（高盛環球高收益 X 美元）", rate: 0.51, nav: 39.6500, navDate: "2026-04-23", currency: "USD", url: "https://invest.fubonlife.com.tw/w/wb/wb02.djhtm?a=ANZ89-NGB1" },
     { name: "NGB2（高盛新興市場債 X 美元）", rate: 0.59, nav: 40.4700, navDate: "2026-04-23", currency: "USD", url: "https://invest.fubonlife.com.tw/w/wb/wb02.djhtm?a=ANZA2-NGB2" },
-    { name: "FBD6（富邦月月興利 VAKT）", rate: 0.0468, nav: 8.9966, navDate: "2026-04-23", currency: "TWD", url: "https://invest.fubonlife.com.tw/w/wr/cf02.djhtm?a=FBD6" }
+    { name: "FBD6（富邦月月興利 VAKT）", rate: 0.0468, nav: 8.9966, navDate: "2026-04-23", currency: "TWD", url: "https://invest.fubonlife.com.tw/w/wr/cf02.djhtm?a=FBD6" },
+    { name: "ACE17（聯博 美國成長 AP 美元）", rate: 0.8322, nav: 74.4800, navDate: "2026-04-29", currency: "USD", url: "https://invest.fubonlife.com.tw/w/wb/wb02.djhtm?a=ALBT8-ACE17" }
   ],
   fxRate: 31.423,
   fxDate: "2026-04-25",
@@ -970,6 +971,7 @@ function sanitizeState() {
     let min = 0.1, max = 1000;
     if (code.indexOf("DSP5") >= 0 || code.indexOf("FBD6") >= 0) { min = 5; max = 25; }
     if (code.indexOf("NGB1") >= 0 || code.indexOf("NGB2") >= 0) { min = 20; max = 90; }
+    if (code.indexOf("ACE17") >= 0) { min = 30; max = 150; }
 
     if (!isFinite(Number(f.nav)) || Number(f.nav) < min || Number(f.nav) > max) {
       const def = DEFAULT_STATE.funds.find(d => d.name === f.name);
