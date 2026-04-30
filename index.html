@@ -960,7 +960,21 @@ function loadState() {
   } catch (e) {
     return cloneDefault();
   }
-  return { ...cloneDefault(), ...s };
+  const merged = { ...cloneDefault(), ...s };
+
+  // 確保 DEFAULT_STATE 裡所有基金都存在於 funds 中
+  // （加新基金時，舊使用者的 localStorage 不會把新基金蓋掉）
+  if (!Array.isArray(merged.funds)) {
+    merged.funds = JSON.parse(JSON.stringify(DEFAULT_STATE.funds));
+  } else {
+    DEFAULT_STATE.funds.forEach(def => {
+      if (!merged.funds.find(f => f && f.name === def.name)) {
+        merged.funds.push(JSON.parse(JSON.stringify(def)));
+      }
+    });
+  }
+
+  return merged;
 }
 
 let state = loadState();
