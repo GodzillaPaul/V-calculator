@@ -48,7 +48,7 @@ body {
     radial-gradient(circle at 88% 16%, rgba(251,139,75,.16), transparent 28%),
     radial-gradient(circle at 48% 42%, rgba(244,114,182,.13), transparent 35%),
     linear-gradient(145deg, #fbfcff 0%, #f3f6fb 46%, #ffffff 100%);
-  padding: 26px 14px 38px;
+  padding: 72px 14px 38px;
   line-height: 1.55;
 }
 
@@ -811,9 +811,117 @@ input::placeholder {
   }
 }
 
+
+/* ── GP 品牌 header bar（月配息計算機用）── */
+.gp-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  background: rgba(255,255,255,.82);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(160,174,192,.18);
+  box-shadow: 0 2px 16px rgba(0,0,0,.06);
+  z-index: 100;
+}
+.gp-bar-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  color: inherit;
+}
+.gp-bar-badge {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  padding: 3px;
+  background: rgba(255,255,255,.95);
+  border: 1px solid rgba(160,174,192,.28);
+  box-shadow: 0 3px 10px rgba(0,0,0,.09);
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+.gp-bar-badge::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.98);
+  z-index: 0;
+}
+.gp-bar-badge::after {
+  content: "";
+  position: absolute;
+  top: -70%; left: -120%;
+  width: 70%; height: 240%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.7), transparent);
+  transform: rotate(24deg);
+  transition: left .7s ease;
+  z-index: 2;
+  pointer-events: none;
+}
+.gp-bar-brand:hover .gp-bar-badge::after { left: 135%; }
+.gp-bar-badge img {
+  position: relative; z-index: 1;
+  width: 100%; height: 100%;
+  object-fit: contain; display: block;
+}
+.gp-bar-text small {
+  display: block;
+  color: #7a8496;
+  font-size: 8.5px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+.gp-bar-text strong {
+  display: block;
+  margin-top: 1px;
+  color: #334155;
+  font-size: 12.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.gp-bar-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.7);
+  border: 1px solid rgba(160,174,192,.30);
+  color: #526179;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.gp-bar-back:hover { background: white; color: #2f80ed; transform: translateX(-2px); }
+@media (max-width: 540px) {
+  .gp-bar-text { display: none; }
+  .gp-bar-back span { display: none; }
+}
 </style>
 </head>
 <body>
+<header class="gp-bar">
+  <a class="gp-bar-brand" href="https://godzillapaul.github.io/Catalog_GodzillaPaul/" aria-label="回到主頁">
+    <div class="gp-bar-badge">
+      <img src="https://godzillapaul.github.io/Catalog_GodzillaPaul/favicon/icon-512x512.png" alt="GodzillaPaul Logo" width="36" height="36">
+    </div>
+    <div class="gp-bar-text">
+      <small>GODZILLAPAUL</small>
+      <strong>月配息計算機</strong>
+    </div>
+  </a>
+  <a class="gp-bar-back" href="https://godzillapaul.github.io/Catalog_GodzillaPaul/" aria-label="返回主頁">← <span>返回</span></a>
+</header>
 <div class="app">
   <div class="topbar">
     <div>
